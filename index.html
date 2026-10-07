@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Permainan Kitar Air Semula Jadi - Sains Tahun 2</title>
+    <!-- MediaPipe CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            font-family: 'Comic Sans MS', 'Fredoka One', 'Chalkboard SE', 'Segoe UI', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(180deg, #4facfe 0%, #00f2fe 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            color: #2c3e50;
+        }
+
+        #game-container {
+            position: relative;
+            width: 1000px;
+            height: 680px;
+            background: linear-gradient(180deg, #87CEEB 0%, #E0F6FF 60%, #1E90FF 100%);
+            border-radius: 24px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            border: 8px solid #FFF;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Background Animated Elements */
+        .bg-sun {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            width: 90px;
+            height: 90px;
+            background: #FFD700;
+            border-radius: 50%;
+            box-shadow: 0 0 40px #FFA500;
+            animation: pulseSun 3s infinite alternate;
+            z-index: 1;
+        }
+
+        @keyframes pulseSun {
+            from { transform: scale(1); box-shadow: 0 0 30px #FFA500; }
+            to { transform: scale(1.1); box-shadow: 0 0 60px #FF4500; }
+        }
+
+        .bg-cloud {
+            position: absolute;
+            background: #FFF;
+            border-radius: 50px;
+            opacity: 0.85;
+            z-index: 1;
+        }
+        .bg-cloud::before, .bg-cloud::after {
+            content: '';
+            position: absolute;
+            background: #FFF;
+            border-radius: 50%;
+        }
+        .cloud-1 { top: 40px; left: 50px; width: 120px; height: 40px; animation: floatCloud 18s linear infinite; }
+        .cloud-1::before { width: 50px; height: 50px; top: -20px; left: 20px; }
+        .cloud-1::after { width: 40px; height: 40px; top: -15px; left: 55px; }
+
+        @keyframes floatCloud {
+            0% { transform: translateX(-150px); }
+            100% { transform: translateX(1100px); }
+        }
+
+        /* Top Bar / HUD */
+        #hud {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(8px);
+            border-bottom: 4px solid #FFD700;
+        }
+
+        .hud-item {
+            font-size: 20px;
+            font-weight: bold;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #FFF;
+            padding: 6px 16px;
+            border-radius: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        .badge-icon {
+            font-size: 24px;
+        }
+
+        /* Webcam Feedback Frame */
+        #webcam-container {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
+            width: 220px;
+            height: 165px;
+            border-radius: 16px;
+            border: 4px solid #FF9800;
+            overflow: hidden;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+            z-index: 20;
+            background: #000;
+        }
+
+        #webcam, #output_canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1); /* Mirror view */
+        }
+
+        /* Question Box */
+        #question-card {
+            position: relative;
+            z-index: 10;
+            margin: 15px auto 5px auto;
+            width: 85%;
+            background: #FFFFFF;
+            border-radius: 20px;
+            padding: 16px 24px;
+            text-align: center;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            border: 4px solid #4CAF50;
+        }
+
+        #question-number {
+            font-size: 16px;
+            font-weight: 800;
+            color: #FF5722;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        #question-text {
+            font-size: 22px;
+            color: #1A237E;
+            font-weight: 700;
+            line-height: 1.3;
+        }
+
+        /* Target Zone (Bucket / Cloud Target) */
+        #target-zone {
+            position: absolute;
+            top: 230px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 220px;
+            height: 130px;
+            border: 4px dashed #FF9800;
+            border-radius: 30px;
+            background: rgba(255, 255, 255, 0.4);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 5;
+            transition: all 0.3s ease;
+        }
+
+        #target-zone.hovered {
+            background: rgba(76, 175, 80, 0.4);
+            border-color: #4CAF50;
+            transform: translateX(-50%) scale(1.1);
+        }
+
+        #target-icon {
+            font-size: 48px;
+            animation: bounce 1.5s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        #target-label {
+            font-size: 16px;
+            font-weight: bold;
+            color: #E65100;
+            background: #FFF;
+            padding: 2px 12px;
+            border-radius: 12px;
+            margin-top: 4px;
+        }
+
+        /* Interactive Balls Area */
+        #options-container {
+            position: absolute;
+            bottom: 40px;
+            left: 40px;
+            width: 680px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            z-index: 15;
+        }
+
+        .option-ball {
+            position: relative;
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #FFD54F, #FF8F00);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.25), inset -5px -5px 15px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 12px;
+            font-size: 17px;
+            font-weight: bold;
+            color: #000;
+            cursor: grab;
+            transition: transform 0.1s ease, box-shadow 0.2s ease;
+            border: 4px solid #FFF;
+            touch-action: none;
+        }
+
+        .option-ball:nth-child(1) { background: radial-gradient(circle at 30% 30%, #81D4FA, #0288D1); color: #FFF; }
+        .option-ball:nth-child(2) { background: radial-gradient(circle at 30% 30%, #A5D6A7, #388E3C); color: #FFF; }
+        .option-ball:nth-child(3) { background: radial-gradient(circle at 30% 30%, #FFAB91, #D84315); color: #FFF; }
+
+        .option-ball.dragging {
+            cursor: grabbing;
+            opacity: 0.9;
+            z-index: 100;
+            transform: scale(1.15) !important;
+            box-shadow: 0 20px 30px rgba(0,0,0,0.4);
+        }
+
+        /* Hand Pointer Indicator */
+        #hand-pointer {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 235, 59, 0.8);
+            border: 3px solid #FF5722;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 999;
+            transform: translate(-50%, -50%);
+            display: none;
+            transition: width 0.1s, height 0.1s, background-color 0.1s;
+        }
+
+        #hand-pointer.pinched {
+            background: rgba(244, 67, 54, 0.9);
+            width: 25px;
+            height: 25px;
+            border-color: #FFF;
+        }
+
+        /* Modals & Overlays */
+        .modal {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(6px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            color: #FFF;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .modal-card {
+            background: #FFF;
+            color: #333;
+            padding: 30px 40px;
+            border-radius: 28px;
+            max-width: 550px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+            border: 6px solid #2196F3;
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .modal h1 {
+            font-size: 32px;
+            color: #1976D2;
+            margin-bottom: 12px;
+        }
+
+        .modal p {
+            font-size: 18px;
+            margin-bottom: 20px;
+            line-height: 1.5;
+            color: #555;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            font-size: 22px;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 6px 15px rgba(255, 152, 0, 0.4);
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 10px 20px rgba(255, 152, 0, 0.6);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #00BCD4 0%, #0097A7 100%);
+            margin-top: 10px;
+            font-size: 18px;
+            padding: 10px 24px;
+        }
+
+        /* Instruction Box inside Start Screen */
+        .instruction-box {
+            background: #E3F2FD;
+            border-radius: 16px;
+            padding: 15px;
+            margin: 15px 0;
+            text-align: left;
+            font-size: 15px;
+            color: #0D47A1;
+        }
+        .instruction-box ul {
+            margin-left: 20px;
+            margin-top: 5px;
+        }
+
+        /* Feedback Toast */
+        #feedback-toast {
+            position: absolute;
+            top: 180px;
+            left: 50%;
+            transform: translateX(-50%) scale(0);
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 26px;
+            font-weight: bold;
+            color: white;
+            z-index: 150;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: none;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+
+        #feedback-toast.correct {
+            background: #4CAF50;
+            transform: translateX(-50%) scale(1);
+        }
+
+        #feedback-toast.wrong {
+            background: #F44336;
+            transform: translateX(-50%) scale(1);
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <!-- Animated Background -->
+    <div class="bg-sun"></div>
+    <div class="bg-cloud cloud-1"></div>
+
+    <!-- Top HUD Bar -->
+    <div id="hud">
+        <div class="hud-item">
+            <span class="badge-icon">⭐</span>
+            <span>Skor: <span id="score-val">0</span></span>
+        </div>
+        <div class="hud-item">
+            <span class="badge-icon">⏳</span>
+            <span>Masa: <span id="timer-val">45</span>s</span>
+        </div>
+        <div class="hud-item">
+            <span class="badge-icon">❤️</span>
+            <span>Nyawa: <span id="lives-val">3</span></span>
+        </div>
+    </div>
+
+    <!-- Question Box -->
+    <div id="question-card">
+        <div id="question-number">Soalan 1 / 30</div>
+        <div id="question-text">Memuatkan soalan...</div>
+    </div>
+
+    <!-- Drop Target Zone -->
+    <div id="target-zone">
+        <div id="target-icon">🌧️</div>
+        <div id="target-label">BALING SINI</div>
+    </div>
+
+    <!-- Answer Balls -->
+    <div id="options-container">
+        <div class="option-ball" id="ball-0" data-index="0">Jawapan A</div>
+        <div class="option-ball" id="ball-1" data-index="1">Jawapan B</div>
+        <div class="option-ball" id="ball-2" data-index="2">Jawapan C</div>
+    </div>
+
+    <!-- Hand Pointer Overlay -->
+    <div id="hand-pointer"></div>
+
+    <!-- Feedback Toast -->
+    <div id="feedback-toast">TAHNIAH! TEPAT!</div>
+
+    <!-- Small Webcam Box -->
+    <div id="webcam-container">
+        <video id="webcam" autoplay playsinline muted></video>
+        <canvas id="output_canvas"></canvas>
+    </div>
+
+    <!-- START MODAL -->
+    <div id="start-modal" class="modal">
+        <div class="modal-card">
+            <h1>🌊 Game Kitar Air Semula Jadi</h1>
+            <p><strong>Sains Tahun 2 Sekolah Rendah</strong></p>
+            
+            <div class="instruction-box">
+                <strong>🎮 Cara Bermain:</strong>
+                <ul>
+                    <li><strong>Kamera Hand Gesture:</strong> Temukan <u>Ibu Jari & Jari Telunjuk (Pinch)</u> di depan kamera untuk pegang (Grab) bola jawapan. Gerakkan ke sasaran & lepaskan untuk baling (Throw)!</li>
+                    <li><strong>Tetikus / Touchscreen:</strong> Boleh juga guna tetikus atau skrin sentuh untuk tarik & lepas bola.</li>
+                    <li>Jawab 30 soalan dengan betul sebelum masa / nyawa habis!</li>
+                </ul>
+            </div>
+
+            <button class="btn" id="start-btn">🚀 MULA PLAY</button>
+        </div>
+    </div>
+
+    <!-- GAME OVER / WIN MODAL -->
+    <div id="end-modal" class="modal" style="display: none;">
+        <div class="modal-card">
+            <h1 id="end-title">TAMAT PERMAINAN</h1>
+            <p id="end-message">Skor Akhir Anda: 0</p>
+            <button class="btn" id="restart-btn">🔄 MAIN LAGI</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// --- AUDIO SYNTHESIZER (Web Audio API) ---
+class SoundFX {
+    constructor() {
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    playGrab() {
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.1);
+    }
+
+    playThrow() {
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(500, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(150, this.ctx.currentTime + 0.25);
+        gain.gain.setValueAtTime(0.4, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.25);
+    }
+
+    playCorrect() {
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        const now = this.ctx.currentTime;
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.2, now + idx * 0.08);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.2);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now + idx * 0.08);
+            osc.stop(now + idx * 0.08 + 0.2);
+        });
+    }
+
+    playWrong() {
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        const now = this.ctx.currentTime;
+        [200, 150].forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.3, now + idx * 0.15);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.15 + 0.2);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now + idx * 0.15);
+            osc.stop(now + idx * 0.15 + 0.2);
+        });
+    }
+}
+
+const sfx = new SoundFX();
+
+// --- 30 QUESTIONS DATABASE (Sains Tahun 2: Kitar Air Semula Jadi) ---
+const questionBank = [
+    {
+        q: "Apakah sumber utama air di permukaan Bumi?",
+        options: ["Sungai dan Laut", "Awan sahaja", "Wap air sahaja"],
+        answer: 0
+    },
+    {
+        q: "Air cecair bertukar menjadi wap air melalui proses apa?",
+        options: ["Kondensasi", "Penyejatan", "Pembekuan"],
+        answer: 1
+    },
+    {
+        q: "Apakah yang membekalkan haba untuk menyejatkan air laut?",
+        options: ["Bulan", "Matahari", "Angin"],
+        answer: 1
+    },
+    {
+        q: "Wap air yang naik ke atas dan menyejuk akan membentuk...",
+        options: ["Awan", "Ombak", "Tanah"],
+        answer: 0
+    },
+    {
+        q: "Proses wap air menyejuk menjadi titisan air dipanggil...",
+        options: ["Penyejatan", "Kondensasi", "Pencairan"],
+        answer: 1
+    },
+    {
+        q: "Apabila awan menjadi terlalu berat dengan titisan air, apakah yang berlaku?",
+        options: ["Awan hilang", "Turun Hujan", "Terbit Matahari"],
+        answer: 1
+    },
+    {
+        q: "Air hujan yang jatuh ke bumi akan mengalir semula ke mana?",
+        options: ["Sungai dan Laut", "Dalam Pokok sahaja", "Atas Awan"],
+        answer: 0
+    },
+    {
+        q: "Mengapakah kitaran air semula jadi sangat penting?",
+        options: ["Membekalkan air berterusan", "Membuatkan siang gelap", "Mematikan tumbuhan"],
+        answer: 0
+    },
+    {
+        q: "Manakah urutan kitaran air yang betul?",
+        options: ["Air -> Wap Air -> Awan -> Hujan", "Hujan -> Awan -> Air -> Wap Air", "Awan -> Wap Air -> Hujan -> Air"],
+        answer: 0
+    },
+    {
+        q: "Apabila air dipanaskan oleh matahari, air akan bertukar menjadi...",
+        options: ["Ais", "Wap air", "Batu"],
+        answer: 1
+    },
+    {
+        q: "Antara berikut, yang manakah wujud dalam bentuk cecair?",
+        options: ["Wap air", "Titisan air hujan", "Ais batu"],
+        answer: 1
+    },
+    {
+        q: "Wap air wujud dalam bentuk...",
+        options: ["Pepejal", "Gas", "Cecair"],
+        answer: 1
+    },
+    {
+        q: "Awan terdiri daripada perhimpunan...",
+        options: ["Wap panas", "Titisan air yang kecil", "Habuk emas"],
+        answer: 1
+    },
+    {
+        q: "Apakah kesan jika kitaran air semula jadi terhenti?",
+        options: ["Bumi kekurangan air bersih", "Bumi menjadi makin sejuk", "Hujan bertambah lebat"],
+        answer: 0
+    },
+    {
+        q: "Adakah jumlah air di bumi berubah secara drastik dalam kitaran air?",
+        options: ["Sentiasa dikitar semula", "Makin bertambah setiap hari", "Habis terus dalam setahun"],
+        answer: 0
+    },
+    {
+        q: "Di manakah kita boleh melihat proses penyejatan dalam kehidupan harian?",
+        options: ["Pakaian basah menjadi kering", "Air membeku dalam peti ais", "Lilin mencair"],
+        answer: 0
+    },
+    {
+        q: "Apabila air batu (ais) dipanaskan, ia bertukar menjadi...",
+        options: ["Cecair air", "Awan hitam", "Wap terus"],
+        answer: 0
+    },
+    {
+        q: "Kondensasi berlaku apabila wap air mengalami proses...",
+        options: ["Pemanasan", "Penyejukan", "Pecahan"],
+        answer: 1
+    },
+    {
+        q: "Titisan air di luar gelas berisi ais adalah contoh proses...",
+        options: ["Kondensasi", "Penyejatan", "Pembakaran"],
+        answer: 0
+    },
+    {
+        q: "Lautan membekalkan sebahagian besar wap air kerana...",
+        options: ["Lautan sangat luas", "Lautan airnya manis", "Lautan tiada angin"],
+        answer: 0
+    },
+    {
+        q: "Apakah yang membantu menggerakkan awan dari laut ke daratan?",
+        options: ["Tiupan Angin", "Cahaya Bulan", "Akar Pokok"],
+        answer: 0
+    },
+    {
+        q: "Antara berikut, manakah BUKAN sumber air semula jadi?",
+        options: ["Sungai", "Tasik", "Air paip bocor"],
+        answer: 2
+    },
+    {
+        q: "Kitar air semula jadi membantu ______ suhu bumi.",
+        options: ["Menyejukkan", "Memanaskan melampau", "Mengeringkan"],
+        answer: 0
+    },
+    {
+        q: "Wap air tidak kelihatan dengan jelas kerana ia berbentuk...",
+        options: ["Gas", "Pepejal keras", "Batu kecil"],
+        answer: 0
+    },
+    {
+        q: "Mengapakah air sungai sentiasa mengalir?",
+        options: ["Mengalir dari kawasan tinggi ke rendah", "Ditolak oleh ikan", "Ditarik oleh matahari"],
+        answer: 0
+    },
+    {
+        q: "Air yang diserap oleh akar pokok akan dibebaskan ke udara melalui...",
+        options: ["Daun (Transpirasi)", "Batang", "Bunga"],
+        answer: 0
+    },
+    {
+        q: "Apabila suhu udara sangat sejuk di puncak gunung, hujan boleh turun sebagai...",
+        options: ["Salji / Ais", "Minyak", "Pasir"],
+        answer: 0
+    },
+    {
+        q: "Apakah peranan tumbuh-tumbuhan dalam kitaran air?",
+        options: ["Menyimpan dan membebaskan air", "Menghalang hujan turun", "Mengeringkan sungai"],
+        answer: 0
+    },
+    {
+        q: "Apakah yang berlaku pada air kolam pada hari yang sangat panas?",
+        options: ["Menyejat dan menjadi berkurang", "Bertambah dengan cepat", "Membeku menjadi ais"],
+        answer: 0
+    },
+    {
+        q: "Kita perlu menjaga kebersihan sungai supaya...",
+        options: ["Bekalan air kitaran sentiasa bersih", "Ikan bertukar warna", "Air tidak menyejat"],
+        answer: 0
+    }
+];
+
+// --- GAME STATE ---
+let currentQIndex = 0;
+let score = 0;
+let lives = 3;
+let timer = 45;
+let timerInterval = null;
+let gameActive = false;
+let draggedBall = null;
+let isPinching = false;
+let pinchedBall = null;
+
+// Initial positions of options balls
+const initialBallPositions = [
+    { left: '40px', bottom: '40px' },
+    { left: '270px', bottom: '40px' },
+    { left: '500px', bottom: '40px' }
+];
+
+// Elements
+const scoreEl = document.getElementById('score-val');
+const timerEl = document.getElementById('timer-val');
+const livesEl = document.getElementById('lives-val');
+const qNumEl = document.getElementById('question-number');
+const qTextEl = document.getElementById('question-text');
+const balls = [document.getElementById('ball-0'), document.getElementById('ball-1'), document.getElementById('ball-2')];
+const targetZone = document.getElementById('target-zone');
+const handPointer = document.getElementById('hand-pointer');
+const feedbackToast = document.getElementById('feedback-toast');
+const startModal = document.getElementById('start-modal');
+const endModal = document.getElementById('end-modal');
+
+// Shuffle Array helper
+function shuffle(array) {
+    return array.sort(() => Math.random() - 0.5);
+}
+
+let activeQuestions = [];
+
+function initGame() {
+    activeQuestions = [...questionBank];
+    shuffle(activeQuestions);
+    currentQIndex = 0;
+    score = 0;
+    lives = 3;
+    scoreEl.textContent = score;
+    livesEl.textContent = "❤️".repeat(lives);
+    startModal.style.display = 'none';
+    endModal.style.display = 'none';
+    gameActive = true;
+    loadQuestion();
+}
+
+function loadQuestion() {
+    if (currentQIndex >= activeQuestions.length || lives <= 0) {
+        endGame();
+        return;
+    }
+
+    const currentQ = activeQuestions[currentQIndex];
+    qNumEl.textContent = `Soalan ${currentQIndex + 1} / ${activeQuestions.length}`;
+    qTextEl.textContent = currentQ.q;
+
+    // Reset option balls
+    balls.forEach((ball, idx) => {
+        ball.textContent = currentQ.options[idx];
+        ball.style.position = 'absolute';
+        ball.style.left = (60 + idx * 220) + 'px';
+        ball.style.bottom = '30px';
+        ball.style.top = 'auto';
+        ball.classList.remove('dragging');
+    });
+
+    // Reset timer per question
+    clearInterval(timerInterval);
+    timer = 45;
+    timerEl.textContent = timer;
+    timerInterval = setInterval(() => {
+        if (!gameActive) return;
+        timer--;
+        timerEl.textContent = timer;
+        if (timer <= 0) {
+            handleAnswer(-1); // Timeout penalty
+        }
+    }, 1000);
+}
+
+function checkCollision(el1, el2) {
+    const rect1 = el1.getBoundingClientRect();
+    const rect2 = el2.getBoundingClientRect();
+    return !(rect1.right < rect2.left || 
+             rect1.left > rect2.right || 
+             rect1.bottom < rect2.top || 
+             rect1.top > rect2.bottom);
+}
+
+function handleAnswer(selectedIndex) {
+    clearInterval(timerInterval);
+    const currentQ = activeQuestions[currentQIndex];
+
+    if (selectedIndex === currentQ.answer) {
+        // Correct
+        sfx.playCorrect();
+        score += 10;
+        scoreEl.textContent = score;
+        showToast("TAHNIAH! TEPAT! 🎉", "correct");
+    } else {
+        // Wrong
+        sfx.playWrong();
+        lives--;
+        livesEl.textContent = "❤️".repeat(Math.max(0, lives));
+        showToast("SALAH! CUBA LAGI ❌", "wrong");
+    }
+
+    currentQIndex++;
+    setTimeout(() => {
+        if (lives > 0 && currentQIndex < activeQuestions.length) {
+            loadQuestion();
+        } else {
+            endGame();
+        }
+    }, 1200);
+}
+
+function showToast(text, type) {
+    feedbackToast.textContent = text;
+    feedbackToast.className = type;
+    setTimeout(() => {
+        feedbackToast.className = '';
+    }, 1000);
+}
+
+function endGame() {
+    gameActive = false;
+    clearInterval(timerInterval);
+    endModal.style.display = 'flex';
+    document.getElementById('end-title').textContent = lives > 0 ? "🎉 TAHNIAH! ANDA MENANG!" : "💔 GAME OVER";
+    document.getElementById('end-message').innerHTML = `Skor Akhir Anda: <strong>${score}</strong><br>Soalan Dijawab: ${currentQIndex} / ${activeQuestions.length}`;
+}
+
+// --- MOUSE & TOUCH DRAG & DROP FALLBACK ---
+balls.forEach(ball => {
+    let isDragging = false;
+    let offsetX, offsetY;
+
+    const startDrag = (e) => {
+        if (!gameActive) return;
+        isDragging = true;
+        draggedBall = ball;
+        ball.classList.add('dragging');
+        sfx.playGrab();
+
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const rect = ball.getBoundingClientRect();
+        offsetX = clientX - rect.left;
+        offsetY = clientY - rect.top;
+    };
+
+    const moveDrag = (e) => {
+        if (!isDragging || !gameActive) return;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const containerRect = document.getElementById('game-container').getBoundingClientRect();
+
+        let x = clientX - containerRect.left - offsetX;
+        let y = clientY - containerRect.top - offsetY;
+
+        ball.style.left = x + 'px';
+        ball.style.top = y + 'px';
+        ball.style.bottom = 'auto';
+
+        if (checkCollision(ball, targetZone)) {
+            targetZone.classList.add('hovered');
+        } else {
+            targetZone.classList.remove('hovered');
+        }
+    };
+
+    const endDrag = () => {
+        if (!isDragging) return;
+        isDragging = false;
+        ball.classList.remove('dragging');
+        sfx.playThrow();
+
+        if (checkCollision(ball, targetZone)) {
+            const selectedIdx = parseInt(ball.getAttribute('data-index'));
+            handleAnswer(selectedIdx);
+        } else {
+            // Reset position
+            const idx = parseInt(ball.getAttribute('data-index'));
+            ball.style.left = (60 + idx * 220) + 'px';
+            ball.style.bottom = '30px';
+            ball.style.top = 'auto';
+        }
+        targetZone.classList.remove('hovered');
+    };
+
+    ball.addEventListener('mousedown', startDrag);
+    window.addEventListener('mousemove', moveDrag);
+    window.addEventListener('mouseup', endDrag);
+
+    ball.addEventListener('touchstart', startDrag);
+    window.addEventListener('touchmove', moveDrag);
+    window.addEventListener('touchend', endDrag);
+});
+
+// --- MEDIAPIPE HAND GESTURE CONTROL ---
+const videoElement = document.getElementById('webcam');
+const canvasElement = document.getElementById('output_canvas');
+const canvasCtx = canvasElement.getContext('2d');
+
+function onResults(results) {
+    canvasCtx.save();
+    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+    canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        handPointer.style.display = 'block';
+        const landmarks = results.multiHandLandmarks[0];
+
+        // Draw hand mesh on small webcam box
+        drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 3});
+        drawLandmarks(canvasCtx, landmarks, {color: '#FF0000', lineWidth: 1, radius: 3});
+
+        // Index Finger Tip (Landmark 8) & Thumb Tip (Landmark 4)
+        const indexTip = landmarks[8];
+        const thumbTip = landmarks[4];
+
+        // Calculate screen coordinates (Mirrored X)
+        const containerRect = document.getElementById('game-container').getBoundingClientRect();
+        const screenX = (1 - indexTip.x) * containerRect.width;
+        const screenY = indexTip.y * containerRect.height;
+
+        // Position hand pointer
+        handPointer.style.left = screenX + 'px';
+        handPointer.style.top = screenY + 'px';
+
+        // Distance for Pinch Detection
+        const distance = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
+        const pinchThreshold = 0.06;
+
+        if (distance < pinchThreshold) {
+            handPointer.classList.add('pinched');
+            
+            if (!isPinching) {
+                // Pinch Start
+                isPinching = true;
+                // Find ball under pointer
+                balls.forEach(ball => {
+                    const rect = ball.getBoundingClientRect();
+                    const pointerX = containerRect.left + screenX;
+                    const pointerY = containerRect.top + screenY;
+
+                    if (pointerX >= rect.left && pointerX <= rect.right &&
+                        pointerY >= rect.top && pointerY <= rect.bottom) {
+                        pinchedBall = ball;
+                        pinchedBall.classList.add('dragging');
+                        sfx.playGrab();
+                    }
+                });
+            }
+
+            // Move grabbed ball
+            if (pinchedBall) {
+                pinchedBall.style.left = (screenX - 70) + 'px';
+                pinchedBall.style.top = (screenY - 70) + 'px';
+                pinchedBall.style.bottom = 'auto';
+
+                if (checkCollision(pinchedBall, targetZone)) {
+                    targetZone.classList.add('hovered');
+                } else {
+                    targetZone.classList.remove('hovered');
+                }
+            }
+
+        } else {
+            // Pinch Released (Throw Action)
+            handPointer.classList.remove('pinched');
+
+            if (isPinching && pinchedBall) {
+                sfx.playThrow();
+                if (checkCollision(pinchedBall, targetZone)) {
+                    const selectedIdx = parseInt(pinchedBall.getAttribute('data-index'));
+                    handleAnswer(selectedIdx);
+                } else {
+                    // Reset position
+                    const idx = parseInt(pinchedBall.getAttribute('data-index'));
+                    pinchedBall.style.left = (60 + idx * 220) + 'px';
+                    pinchedBall.style.bottom = '30px';
+                    pinchedBall.style.top = 'auto';
+                }
+                pinchedBall.classList.remove('dragging');
+                pinchedBall = null;
+                targetZone.classList.remove('hovered');
+            }
+            isPinching = false;
+        }
+
+    } else {
+        handPointer.style.display = 'none';
+    }
+    canvasCtx.restore();
+}
+
+const hands = new Hands({
+    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+});
+
+hands.setOptions({
+    maxNumHands: 1,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.6,
+    minTrackingConfidence: 0.6
+});
+
+hands.onResults(onResults);
+
+// Setup Camera
+const camera = new Camera(videoElement, {
+    onFrame: async () => {
+        await hands.send({image: videoElement});
+    },
+    width: 320,
+    height: 240
+});
+
+// Start Buttons
+document.getElementById('start-btn').addEventListener('click', () => {
+    camera.start().catch(err => {
+        console.warn("Kamera tidak diakses atau ditolak. Kawalan tetikus masih boleh digunakan.", err);
+    });
+    initGame();
+});
+
+document.getElementById('restart-btn').addEventListener('click', () => {
+    initGame();
+});
+</script>
+
+</body>
+</html>
